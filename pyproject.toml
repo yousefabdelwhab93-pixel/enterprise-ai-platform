@@ -1,0 +1,17 @@
+
+[project]
+name = "enterprise-ai-platform"
+version = "0.1.0"
+description = "A bilingual, multi-tenant AI knowledge and support platform."
+requires-python = ">=3.12,<3.13"
+
+dependencies = [
+    "fastapi>=0.165.0",
+    "uvicorn[standard]>=0.54.0",
+    "pydantic-settings>=2.16.3",
+]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
