@@ -7,6 +7,8 @@ from backend.app.core.config import settings
 from backend.app.schemas.common import HealthResponse
 from backend.app.api.dependencies import get_app_name
 from backend.app.api.routes import tenants
+from backend.app.api.routes import users
+from backend.app.api.routes import auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,6 +35,14 @@ app.include_router(
     prefix="/api/v1",
 )
 
+# Users Router
+app.include_router(
+    users.router,
+    prefix="/api/v1",
+)
+
+app.include_router(auth.router, prefix="/api/v1")
+
 
 @app.get("/", response_model=HealthResponse)
 def root(app_name: str = Depends(get_app_name)):
@@ -40,4 +50,5 @@ def root(app_name: str = Depends(get_app_name)):
         "message": f"{app_name} is running!",
         "status": "success",
     }
+
 
