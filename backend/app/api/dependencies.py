@@ -1,18 +1,19 @@
-from fastapi import Depends
+from uuid import UUID
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.core.config import Settings, settings
 from backend.app.core.database import SessionLocal
-from uuid import UUID
-
-from fastapi import HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
 from backend.app.core.security import decode_access_token
-from backend.app.models.user import User
-from sqlalchemy import select
 from backend.app.core.permissions import Permission
 from backend.app.core.role_permissions import has_permission
+
+from backend.app.models.user import User
+from backend.app.models.tenant import Tenant
+
 
 def get_settings() -> Settings:
     return settings
@@ -53,6 +54,7 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Check if user exists and is active
     user = db.scalar(
         select(User).where(
             User.id == user_id,
@@ -68,7 +70,23 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Check if tenant exists and is active
+    tenant = db.scalar(
+        select(Tenant).where(
+            Tenant.id == tenant_id,
+            Tenant.is_active.is_(True),
+        )
+    )
+
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Tenant not found or inactive",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return user
+
 
 def require_tenant_access(
     tenant_id: UUID,
@@ -80,18 +98,19 @@ def require_tenant_access(
             detail="Access denied to this tenant",
         )
 
-    return current_user 
+    return current_user
+
 
 def require_permission(permission: Permission):
 
     def permission_checker(
-        current_user = Depends(get_current_user)
+        current_user: User = Depends(get_current_user),
     ):
 
         if not has_permission(current_user.role, permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to perform this action"
+                detail="You don't have permission to perform this action",
             )
 
         return current_user

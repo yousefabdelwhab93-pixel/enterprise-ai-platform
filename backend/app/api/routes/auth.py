@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.app.api.dependencies import get_db
 from backend.app.core.security import verify_password, create_access_token
 from backend.app.models.user import User
 from backend.app.models.tenant import Tenant
 from backend.app.schemas.auth import LoginRequest, TokenResponse
-from backend.app.api.dependencies import get_current_user
+from backend.app.api.dependencies import get_db, get_current_user
 from backend.app.schemas.user import UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -22,7 +21,7 @@ def login(
     tenant = db.scalar(
         select(Tenant).where(
             Tenant.id == login_data.tenant_id,
-            Tenant.is_active == True,
+            Tenant.is_active.is_(True),
         )
     )
 
@@ -37,7 +36,7 @@ def login(
         select(User).where(
             User.tenant_id == login_data.tenant_id,
             User.email == login_data.email.lower().strip(),
-            User.is_active == True,
+            User.is_active.is_(True),
         )
     )
 
