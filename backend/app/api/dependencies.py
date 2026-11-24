@@ -11,7 +11,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from backend.app.core.security import decode_access_token
 from backend.app.models.user import User
 from sqlalchemy import select
-
+from backend.app.core.permissions import Permission
+from backend.app.core.role_permissions import has_permission
 
 def get_settings() -> Settings:
     return settings
@@ -56,7 +57,7 @@ def get_current_user(
         select(User).where(
             User.id == user_id,
             User.tenant_id == tenant_id,
-            User.is_active == True,
+            User.is_active.is_(True),
         )
     )
 
@@ -68,3 +69,31 @@ def get_current_user(
         )
 
     return user
+
+def require_tenant_access(
+    tenant_id: UUID,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to this tenant",
+        )
+
+    return current_user 
+
+def require_permission(permission: Permission):
+
+    def permission_checker(
+        current_user = Depends(get_current_user)
+    ):
+
+        if not has_permission(current_user.role, permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to perform this action"
+            )
+
+        return current_user
+
+    return permission_checker

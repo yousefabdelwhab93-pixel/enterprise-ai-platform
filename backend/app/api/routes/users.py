@@ -3,13 +3,18 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from uuid import UUID
-from backend.app.schemas.user import UserCreate, UserResponse, UserUpdate
 
-from backend.app.api.dependencies import get_db
+from backend.app.api.dependencies import (
+    get_db,
+    get_current_user,
+    require_permission,
+    require_tenant_access,
+)
+from backend.app.core.permissions import Permission
 from backend.app.core.security import hash_password
 from backend.app.models.tenant import Tenant
 from backend.app.models.user import User
-from backend.app.schemas.user import UserCreate, UserResponse
+from backend.app.schemas.user import UserCreate, UserResponse, UserUpdate
 
 
 router = APIRouter(
@@ -18,15 +23,30 @@ router = APIRouter(
 )
 
 
+# =========================
+# CREATE USER
+# =========================
+
 @router.post(
     "/",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(require_permission(Permission.USERS_CREATE))
+    ],
 )
 def create_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    # Ensure user can only create users inside their own tenant
+    if current_user.tenant_id != user_data.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to this tenant.",
+        )
+
     # Check if tenant exists and is active
     tenant_statement = select(Tenant).where(
         Tenant.id == user_data.tenant_id,
@@ -70,9 +90,17 @@ def create_user(
         )
 
 
+# =========================
+# GET ALL USERS
+# =========================
+
 @router.get(
     "/",
     response_model=list[UserResponse],
+    dependencies=[
+        Depends(require_permission(Permission.USERS_READ)),
+        Depends(require_tenant_access),
+    ],
 )
 def get_all_users(
     tenant_id: UUID,
@@ -108,7 +136,19 @@ def get_all_users(
 
     return users
 
-@router.get("/{user_id}", response_model=UserResponse)
+
+# =========================
+# GET USER BY ID
+# =========================
+
+@router.get(
+    "/{user_id}",
+    response_model=UserResponse,
+    dependencies=[
+        Depends(require_permission(Permission.USERS_READ)),
+        Depends(require_tenant_access),
+    ],
+)
 def get_user_by_id(
     user_id: UUID,
     tenant_id: UUID,
@@ -131,7 +171,18 @@ def get_user_by_id(
     return user
 
 
-@router.patch("/{user_id}", response_model=UserResponse)
+# =========================
+# UPDATE USER
+# =========================
+
+@router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    dependencies=[
+        Depends(require_permission(Permission.USERS_UPDATE)),
+        Depends(require_tenant_access),
+    ],
+)
 def update_user(
     user_id: UUID,
     tenant_id: UUID,
@@ -163,17 +214,30 @@ def update_user(
     try:
         db.commit()
         db.refresh(user)
+
         return user
 
     except IntegrityError:
         db.rollback()
+
         raise HTTPException(
             status_code=409,
             detail="User with this email already exists in this tenant.",
         )
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+# =========================
+# DELETE USER
+# =========================
+
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[
+        Depends(require_permission(Permission.USERS_DELETE)),
+        Depends(require_tenant_access),
+    ],
+)
 def delete_user(
     user_id: UUID,
     tenant_id: UUID,
@@ -193,6 +257,7 @@ def delete_user(
             detail="User not found.",
         )
 
+    # Soft delete
     user.is_active = False
 
     db.commit()
