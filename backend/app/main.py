@@ -9,6 +9,7 @@ from backend.app.api.dependencies import get_app_name
 from backend.app.api.routes import tenants
 from backend.app.api.routes import users
 from backend.app.api.routes import auth
+from backend.app.api.routes import documents
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,6 +43,12 @@ app.include_router(
 )
 
 app.include_router(auth.router, prefix="/api/v1")
+
+# Documents Router
+app.include_router(
+    documents.router,
+    prefix="/api/v1",
+)
 
 
 @app.get("/", response_model=HealthResponse)
