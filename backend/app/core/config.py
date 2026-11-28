@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     # PostgreSQL
     DATABASE_URL: str = ""
 
+
+    # Object Storage (MinIO / S3-compatible)
+    STORAGE_ENDPOINT_URL: str = "http://localhost:9000"
+    STORAGE_ACCESS_KEY: str = ""
+    STORAGE_SECRET_KEY: str = ""
+    STORAGE_BUCKET_NAME: str = "enterprise-documents"
+    STORAGE_REGION: str = "us-east-1"
+
     # JWT Authentication
     JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
